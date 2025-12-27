@@ -26,7 +26,15 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://hyperlocal-insurance-api.onrender.com",
+        "https://*.onrender.com",  # All Render deployments
+        "https://*.netlify.app",   # Netlify deployments
+        "http://localhost:3000",   # Local development
+        "http://localhost:8080",   # Local development
+        "http://127.0.0.1:3000",   # Local development
+        "*"  # Allow all for testing (remove in production)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
