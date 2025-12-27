@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperlocal Intelligence Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white mb-4">Hyperlocal Intelligence Platform</h1>
+            <p class="text-xl text-blue-200">Parametric Insurance Monitoring & Risk Management</p>
+        </header>
+
+        <nav class="flex justify-center gap-4 mb-8 flex-wrap">
+            <button onclick="showTab('dashboard')" class="tab-btn px-6 py-3 rounded-lg font-semibold bg-white text-purple-900">Dashboard</button>
+            <button onclick="showTab('locations')" class="tab-btn px-6 py-3 rounded-lg font-semibold bg-purple-800 text-white hover:bg-purple-700">Locations</button>
+            <button onclick="showTab('triggers')" class="tab-btn px-6 py-3 rounded-lg font-semibold bg-purple-800 text-white hover:bg-purple-700">Triggers</button>
+            <button onclick="showTab('alerts')" class="tab-btn px-6 py-3 rounded-lg font-semibold bg-purple-800 text-white hover:bg-purple-700">Alerts</button>
+        </nav>
+
+        <div id="dashboard-view" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div id="alerts-panel" class="bg-white rounded-xl shadow-2xl p-6"></div>
+            <div id="forecast-panel" class="bg-white rounded-xl shadow-2xl p-6"></div>
+            <div id="locations-panel" class="bg-white rounded-xl shadow-2xl p-6"></div>
+            <div id="triggers-panel" class="bg-white rounded-xl shadow-2xl p-6"></div>
+        </div>
+
+        <div id="locations-view" class="hidden">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-4xl mx-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Locations</h2>
+                    <button onclick="toggleLocationForm()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">+ Add Location</button>
+                </div>
+                <div id="location-form" class="hidden mb-6 p-4 bg-gray-50 rounded-lg">
+                    <form onsubmit="addLocation(event)" class="space-y-3">
+                        <input type="text" id="loc-name" placeholder="Location Name" class="w-full px-4 py-2 border rounded-lg" required>
+                        <div class="grid grid-cols-2 gap-3">
+                            <input type="number" step="0.0001" id="loc-lat" placeholder="Latitude" class="px-4 py-2 border rounded-lg" required>
+                            <input type="number" step="0.0001" id="loc-lon" placeholder="Longitude" class="px-4 py-2 border rounded-lg" required>
+                        </div>
+                        <input type="text" id="loc-insurer" placeholder="Insurer ID" class="w-full px-4 py-2 border rounded-lg" required>
+                        <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Add Location</button>
+                    </form>
+                </div>
+                <div id="locations-list"></div>
+            </div>
+        </div>
+
+        <div id="triggers-view" class="hidden">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-4xl mx-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Parametric Triggers</h2>
+                    <button onclick="toggleTriggerForm()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">+ Create Trigger</button>
+                </div>
+                <div id="trigger-form" class="hidden mb-6 p-4 bg-gray-50 rounded-lg">
+                    <form onsubmit="createTrigger(event)" class="space-y-3">
+                        <select id="trig-location" class="w-full px-4 py-2 border rounded-lg" required></select>
+                        <select id="trig-type" class="w-full px-4 py-2 border rounded-lg">
+                            <option value="rainfall">Rainfall (mm/h)</option>
+                            <option value="wind_speed">Wind Speed (m/s)</option>
+                            <option value="temperature">Temperature (°C)</option>
+                        </select>
+                        <div class="grid grid-cols-2 gap-3">
+                            <select id="trig-operator" class="px-4 py-2 border rounded-lg">
+                                <option value="gt">Greater Than</option>
+                                <option value="gte">Greater or Equal</option>
+                                <option value="lt">Less Than</option>
+                                <option value="lte">Less or Equal</option>
+                            </select>
+                            <input type="number" step="0.1" id="trig-value" placeholder="Threshold" class="px-4 py-2 border rounded-lg" required>
+                        </div>
+                        <input type="number" step="100" id="trig-payout" placeholder="Payout Amount (optional)" class="w-full px-4 py-2 border rounded-lg">
+                        <button type="submit" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create Trigger</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="alerts-view" class="hidden">
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-4xl mx-auto">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Active Alerts</h2>
+                <div id="alerts-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentTab = 'dashboard';
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('[id$="-view"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(tab + '-view').classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = 'tab-btn px-6 py-3 rounded-lg font-semibold bg-purple-800 text-white hover:bg-purple-700';
+            });
+            event.target.className = 'tab-btn px-6 py-3 rounded-lg font-semibold bg-white text-purple-900';
+            
+            if (tab === 'locations') loadLocationsView();
+            if (tab === 'alerts') loadAlertsView();
+        }
+
+        function toggleLocationForm() {
+            document.getElementById('location-form').classList.toggle('hidden');
+        }
+
+        function toggleTriggerForm() {
+            document.getElementById('trigger-form').classList.toggle('hidden');
+            loadLocationsForTrigger();
+        }
+
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}/alerts?active_only=true`);
+                const alerts = await response.json();
+                const panel = document.getElementById('alerts-panel');
+                
+                panel.innerHTML = '<h2 class="text-2xl font-bold text-gray-800 mb-6">Active Alerts</h2>';
+                
+                if (alerts.length === 0) {
+                    panel.innerHTML += '<p class="text-gray-500 text-center py-8">No active alerts</p>';
+                } else {
+                    alerts.forEach(alert => {
+                        const colors = {
+                            critical: 'bg-red-100 border-red-500',
+                            high: 'bg-orange-100 border-orange-500',
+                            medium: 'bg-yellow-100 border-yellow-500',
+                            low: 'bg-blue-100 border-blue-500'
+                        };
+                        panel.innerHTML += `
+                            <div class="p-4 rounded-lg border-l-4 ${colors[alert.risk_level]} mb-4">
+                                <span class="font-bold text-sm uppercase">${alert.risk_level}</span>
+                                <p class="text-sm mt-1">${alert.message}</p>
+                                <button onclick="resolveAlert('${alert.id}')" class="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Resolve</button>
+                            </div>
+                        `;
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+            }
+        }
+
+        async function loadLocations() {
+            try {
+                const response = await fetch(`${API_BASE}/locations`);
+                const locations = await response.json();
+                const panel = document.getElementById('locations-panel');
+                
+                panel.innerHTML = '<h2 class="text-2xl font-bold text-gray-800 mb-6">Locations</h2>';
+                locations.forEach(loc => {
+                    panel.innerHTML += `
+                        <div class="p-4 bg-gray-50 rounded-lg mb-3">
+                            <h3 class="font-semibold text-lg">${loc.name}</h3>
+                            <p class="text-sm text-gray-600">${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}</p>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        async function addLocation(e) {
+            e.preventDefault();
+            try {
+                const response = await fetch(`${API_BASE}/locations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('loc-name').value,
+                        latitude: parseFloat(document.getElementById('loc-lat').value),
+                        longitude: parseFloat(document.getElementById('loc-lon').value),
+                        insurer_id: document.getElementById('loc-insurer').value,
+                        policy_ids: []
+                    })
+                });
+                if (response.ok) {
+                    alert('Location added!');
+                    e.target.reset();
+                    toggleLocationForm();
+                    loadLocationsView();
+                    loadLocations();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function loadLocationsView() {
+            try {
+                const response = await fetch(`${API_BASE}/locations`);
+                const locations = await response.json();
+                const list = document.getElementById('locations-list');
+                
+                list.innerHTML = locations.map(loc => `
+                    <div class="p-4 bg-gray-50 rounded-lg mb-3">
+                        <h3 class="font-semibold text-lg">${loc.name}</h3>
+                        <p class="text-sm text-gray-600">${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}</p>
+                        <p class="text-xs text-gray-500 mt-1">Insurer: ${loc.insurer_id}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function loadAlertsView() {
+            try {
+                const response = await fetch(`${API_BASE}/alerts?active_only=true`);
+                const alerts = await response.json();
+                const list = document.getElementById('alerts-list');
+                
+                if (alerts.length === 0) {
+                    list.innerHTML = '<p class="text-gray-500 text-center py-8">No active alerts</p>';
+                } else {
+                    list.innerHTML = alerts.map(alert => {
+                        const colors = {
+                            critical: 'bg-red-100 border-red-500',
+                            high: 'bg-orange-100 border-orange-500',
+                            medium: 'bg-yellow-100 border-yellow-500',
+                            low: 'bg-blue-100 border-blue-500'
+                        };
+                        return `
+                            <div class="p-4 rounded-lg border-l-4 ${colors[alert.risk_level]} mb-4">
+                                <span class="font-bold text-sm uppercase">${alert.risk_level}</span>
+                                <p class="text-sm mt-1">${alert.message}</p>
+                                <button onclick="resolveAlert('${alert.id}')" class="mt-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">Resolve</button>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function resolveAlert(id) {
+            try {
+                await fetch(`${API_BASE}/alerts/${id}/resolve`, { method: 'PATCH' });
+                loadAlerts();
+                if (currentTab === 'alerts') loadAlertsView();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function loadLocationsForTrigger() {
+            try {
+                const response = await fetch(`${API_BASE}/locations`);
+                const locations = await response.json();
+                const select = document.getElementById('trig-location');
+                select.innerHTML = '<option value="">Select Location</option>' + 
+                    locations.map(loc => `<option value="${loc.id}">${loc.name}</option>`).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function createTrigger(e) {
+            e.preventDefault();
+            try {
+                const response = await fetch(`${API_BASE}/triggers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        location_id: document.getElementById('trig-location').value,
+                        trigger_type: document.getElementById('trig-type').value,
+                        threshold_operator: document.getElementById('trig-operator').value,
+                        threshold_value: parseFloat(document.getElementById('trig-value').value),
+                        payout_amount: document.getElementById('trig-payout').value ? parseFloat(document.getElementById('trig-payout').value) : null,
+                        duration_hours: 1,
+                        active: true
+                    })
+                });
+                if (response.ok) {
+                    alert('Trigger created!');
+                    e.target.reset();
+                    toggleTriggerForm();
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Initialize
+        loadAlerts();
+        loadLocations();
+        setInterval(loadAlerts, 30000);
+    </script>
+</body>
+</html>
